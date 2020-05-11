@@ -1,5 +1,6 @@
 const mysql = require('mysql');
 const inquirer = require('inquirer');
+const cTable = require('console.table');
 
 const connection = mysql.createConnection({
   host: 'localhost',
@@ -15,13 +16,31 @@ connection.connect(err => {
 });
 
 const userPrompt = () => {
-    inquirer.prompt([
-        {
+    inquirer
+    .prompt({
             type: "list",
-            name:"MainMenu",
+            name:"mainMenu",
             message:"What would you like to do?",
-            choices:["View all employees"]
-        }
-    ])
+            choices:["View all employees", "View all departments", "View all roles", "Add employee"]
+        })
+        .then(answer =>{
+            switch (answer.mainMenu){
+                case 'View all employees':
+                    viewAll('employee');
+                    break;
+                case 'View all departments':
+                    viewAll('department');
+                    break;
+                case 'View all roles':
+                    viewAll('role');
+                    break;
+            }
+        })
 }
 
+const viewAll = (choice) =>{
+    connection.query(`SELECT * FROM ${choice}`, (err, res) =>{
+        if (err) throw err;
+        console.table(res);
+    })
+}

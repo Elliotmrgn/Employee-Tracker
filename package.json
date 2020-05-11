@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "console.table": "^0.10.0",
     "mysql": "^2.16.0",
     "inquirer": "^6.3.1"
   },
