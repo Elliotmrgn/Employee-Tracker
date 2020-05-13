@@ -44,18 +44,18 @@ const userPrompt = async () => {
             type: "list",
             name: "mainMenu",
             message: "What would you like to do?",
-            choices: ["View all employees", "View all departments", "View all roles", "Add department", "Add employee"]
+            choices: ["View all employees", "View all departments", "View all roles", "Add department", "Add role", "Add employee", "Update employee role"]
         })
         .then(answer => {
             switch (answer.mainMenu) {
                 case 'View all employees':
-                    viewAll('employee');
+                    viewAll(Employees);
                     break;
                 case 'View all departments':
-                    viewAll('department');
+                    viewAll(Departments);
                     break;
                 case 'View all roles':
-                    viewAll('role');
+                    viewAll(Roles);
                     break;
                 case 'Add employee':
                     addEmployee();
@@ -63,19 +63,24 @@ const userPrompt = async () => {
                 case 'Add department':
                     addDepartment();
                     break;
+                case 'Add role':
+                    addRole();
+                    break;
+                case 'Update employee role':
+                    updateEmployeeRole();
+                    break;
             }
         })
 }
 
 const viewAll = async (choice) => {
-    await connection.query(`SELECT * FROM ${choice}`, (err, res) => {
-        if (err) throw err;
-        console.clear();
-        console.table(res);
-        userPrompt();
-    })
-
+    const display = await choice.getData()
+    console.clear();
+    console.log("");
+    console.table(display)
+    userPrompt();
 }
+
 const addDepartment = () => {
     inquirer.prompt({
         type: "input",
@@ -89,15 +94,47 @@ const addDepartment = () => {
                     console.log("Successfully Added Department")
                     userPrompt();
                 })
-                .catch(err => {
-                    if (err) throw err;
-                })
+                .catch(err => { if (err) throw err })
         })
+}
+
+const addRole = async () => {
+    const departments = await Departments.getDepartmentNames();
+    inquirer.prompt([
+        {
+            type: "input",
+            name: "title",
+            message: "Enter new role name"
+        },
+        {
+            type: "input",
+            name: "salary",
+            message: "Enter new role salary"
+        },
+        {
+            type: "list",
+            name: "department",
+            message: "What department is this role for?",
+            choices: [...departments]
+        }
+    ]).then(async answers => {
+        console.log("addRole -> answers", answers)
+        const departmentID = await Departments.matchNameToID(answers.department)
+        console.log("addRole -> departmentID", departmentID)
+        connection.query(`INSERT INTO role SET ?`, [{ title: answers.title, salary: answers.salary, department_id: departmentID }])
+            .then(() => {
+                console.clear();
+                console.log("Successfully Added Role")
+                userPrompt();
+            })
+            .catch(err => { if (err) throw err })
+    })
 }
 
 const addEmployee = async () => {
     const roles = await Roles.getRoleTitles();
-    const managers = await Managers.getManagerNames();
+    console.log("addEmployee -> roles", roles)
+    const managers = await Employees.getManagerNames();
     await inquirer
         .prompt([
             {
@@ -123,81 +160,141 @@ const addEmployee = async () => {
                 choices: [...managers]
             }
         ]).then(async answers => {
+            console.log("addEmployee -> answers", answers)
             const roleID = await Roles.matchTitleToID(answers.role);
-            const managerID = await Managers.matchNameToID(answers.manager);
+            console.log("addEmployee -> roleID", roleID)
+            const managerID = await Employees.matchManagerNameToID(answers.manager);
+            console.log("addEmployee -> managerID", managerID)
             connection.query(
                 `INSERT INTO employee SET ?;`, [{ first_name: answers.firstName, last_name: answers.lastName, role_id: roleID, manager_id: managerID }])
                 .then(() => {
-                    console.clear();
+                    //console.clear();
                     console.log("Successfully Created New Employee!");
                     userPrompt();
                 })
-                .catch(err => {
-                    if (err) throw err;
-                })
+                .catch(err => { if (err) throw err })
         })
+}
+
+const updateEmployeeRole = async () => {
+    const employees = await Employees.getNames();
+    const roles = await Roles.getRoleTitles();
+    await inquirer.prompt([
+        {
+            type: "list",
+            name: "employee",
+            message: "Which employee would you like to update?",
+            choices: [...employees]
+        },
+        {
+            type: "list",
+            name: "newRole",
+            message: "Which role would you like to give them?",
+            choices: [...roles]
+        }
+    ]).then(async answers => {
+        const roleID = await Roles.matchTitleToID(answers.newRole);
+        const employeeID = await Employees.matchNameToID(answers.employee)
+        await connection.query(`UPDATE employee SET role_id=${roleID} WHERE id=${employeeID}`)
+            .then(() => {
+                console.clear();
+                console.log("Successfully Updated!")
+                userPrompt();
+            })
+            .catch(err => { if (err) throw err })
+    })
+}
+
+const Departments = {
+    getData: async () => { return connection.query(`Select * FROM department`) },
+
+    getDepartmentNames: async () => {
+        const names = []
+        await connection.query(`SELECT name FROM department`)
+            .then(rows => {
+                rows.forEach(row => {
+                    names.push(row.name)
+                })
+            })
+        return names
+    },
+
+    matchNameToID: async (nameInput) => {
+        let found;
+        await connection.query(`SELECT id FROM department WHERE name = "${nameInput}"`)
+            .then(rows => {
+                found = rows[0].id
+            })
+
+        return found;
+    }
 }
 
 const Roles = {
-    getRoles: async () => {
-        const data = await connection.query(`SELECT * FROM role`)
-        let roles = []
-        data.forEach(row => {
-            let current = {};
-            current.id = row.id;
-            current.title = row.title;
-            current.salary = row.salary;
-            roles.push(current)
-        })
-        return roles;
-    },
+    getData: async () => { return connection.query(`SELECT * FROM role`) },
 
-    getRoleIDs: async () => {
-        let roleIDs = []
-        const getRoles = await Roles.getRoles();
-        getRoles.forEach(role => roleIDs.push(role.id))
-        return roleIDs
-    },
+    getRoleIDs: async () => { return connection.query(`SELECT id FROM role`) },
 
     getRoleTitles: async () => {
-        let roleTitles = []
-        const getRoles = await Roles.getRoles();
-        getRoles.forEach(role => roleTitles.push(role.title))
-        return roleTitles
+        const titles = []
+        await connection.query(`SELECT title FROM role`)
+            .then(rows => {
+                rows.forEach(row => {
+                    titles.push(row.title)
+                })
+            })
+        return titles
     },
+
     matchTitleToID: async titleInput => {
-        const getRoles = await Roles.getRoles();
-        const foundID = getRoles.find(({ title }) => title === titleInput).id;
-        return foundID;
+        let found;
+        await connection.query(`SELECT id FROM role WHERE title = "${titleInput}"`)
+            .then(rows => {
+                found = rows[0].id
+            })
+
+        return found;
     }
 
 
 }
-const Managers = {
-    getManagers: async () => {
-        const data = await connection.query(`SELECT * FROM employee WHERE manager_id IS NULL`)
-        let managers = []
-        data.forEach((row) => {
-            let current = {}
-            current.name = `${row.first_name} ${row.last_name}`;
-            current.id = row.id;
-            managers.push(current);
-        });
-        return managers;
+const Employees = {
+
+    getData: async () => { return connection.query(`Select * FROM employee`) },
+
+    getEmployees: async (query) => {
+        let employees = []
+        await connection.query(query)
+            .then(rows => {
+                rows.forEach((row) => {
+                    let current = {}
+                    current.name = `${row.first_name} ${row.last_name}`;
+                    current.id = row.id;
+                    employees.push(current);
+                })
+            })
+        return employees;
     },
 
-    getManagerNames: async () => {
-        let managerNames = [];
-        const getManagers = await Managers.getManagers();
-        getManagers.forEach(manager => managerNames.push(manager.name))
-        return managerNames;
+    getNames: async (query) => {
+        let names = [];
+        if (!query) { query = `SELECT * FROM employee` }
+        const employees = await Employees.getEmployees(query);
+        employees.forEach(manager => names.push(manager.name))
+        return names;
     },
 
-    matchNameToID: async nameInput => {
-        const getManagers = await Managers.getManagers();
-        const foundID = getManagers.find(({ name }) => name === nameInput).id;
+    getManagerNames: () => {
+        return Employees.getNames(`SELECT * FROM employee WHERE manager_id IS NULL`)
+    },
+    matchManagerNameToID: (nameInput) => {
+        return Employees.matchNameToID(nameInput, `SELECT * FROM employee WHERE manager_id IS NULL`)
+    },
+    matchNameToID: async (nameInput, query) => {
+        if (!query) { query = `SELECT * FROM employee` }
+        const employees = await Employees.getEmployees(query);
+        const foundID = employees.find(({ name }) => name === nameInput).id;
         return foundID;
     }
 }
-
 userPrompt();
