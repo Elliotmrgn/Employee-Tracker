@@ -3,6 +3,8 @@ const inquirer = require('inquirer');
 const util = require('util');
 const cTable = require('console.table');
 
+//promisifying the database, documentation below
+// https://codeburst.io/node-js-mysql-and-promises-4c3be599909b
 class Database {
     constructor(config) {
         this.connection = mysql.createConnection(config);
@@ -42,7 +44,7 @@ const userPrompt = async () => {
             type: "list",
             name: "mainMenu",
             message: "What would you like to do?",
-            choices: ["View all employees", "View all departments", "View all roles", "Add employee"]
+            choices: ["View all employees", "View all departments", "View all roles", "Add department", "Add employee"]
         })
         .then(answer => {
             switch (answer.mainMenu) {
@@ -58,6 +60,9 @@ const userPrompt = async () => {
                 case 'Add employee':
                     addEmployee();
                     break;
+                case 'Add department':
+                    addDepartment();
+                    break;
             }
         })
 }
@@ -70,6 +75,24 @@ const viewAll = async (choice) => {
         userPrompt();
     })
 
+}
+const addDepartment = () => {
+    inquirer.prompt({
+        type: "input",
+        name: "departmentName",
+        message: "Enter new department name"
+    })
+        .then(answers => {
+            connection.query(`INSERT into department (name) VALUES ("${answers.departmentName}")`)
+                .then(() => {
+                    console.clear();
+                    console.log("Successfully Added Department")
+                    userPrompt();
+                })
+                .catch(err => {
+                    if (err) throw err;
+                })
+        })
 }
 
 const addEmployee = async () => {
@@ -102,15 +125,17 @@ const addEmployee = async () => {
         ]).then(async answers => {
             const roleID = await Roles.matchTitleToID(answers.role);
             const managerID = await Managers.matchNameToID(answers.manager);
-            await connection.query(
-                `INSERT INTO employee SET ?`,
-                [{ first_name: answers.firstName, last_name: answers.lastName, role_id: roleID, manager_id: managerID }],
-                (err, res) => {
-                    if (err) throw err;
+            connection.query(
+                `INSERT INTO employee SET ?;`, [{ first_name: answers.firstName, last_name: answers.lastName, role_id: roleID, manager_id: managerID }])
+                .then(() => {
+                    console.clear();
                     console.log("Successfully Created New Employee!");
+                    userPrompt();
+                })
+                .catch(err => {
+                    if (err) throw err;
                 })
         })
-    userPrompt();
 }
 
 const Roles = {
