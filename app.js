@@ -133,7 +133,6 @@ const addRole = async () => {
 
 const addEmployee = async () => {
     const roles = await Roles.getRoleTitles();
-    console.log("addEmployee -> roles", roles)
     const managers = await Employees.getManagerNames();
     await inquirer
         .prompt([
@@ -160,11 +159,8 @@ const addEmployee = async () => {
                 choices: [...managers]
             }
         ]).then(async answers => {
-            console.log("addEmployee -> answers", answers)
             const roleID = await Roles.matchTitleToID(answers.role);
-            console.log("addEmployee -> roleID", roleID)
             const managerID = await Employees.matchManagerNameToID(answers.manager);
-            console.log("addEmployee -> managerID", managerID)
             connection.query(
                 `INSERT INTO employee SET ?;`, [{ first_name: answers.firstName, last_name: answers.lastName, role_id: roleID, manager_id: managerID }])
                 .then(() => {

@@ -9,7 +9,7 @@ To run you must set up the database schema provided with a MySQL workbench. Then
 ## Tests
 The following manual tests can be seen below
 
-*insert gif*
+![demo video](https://i.imgur.com/L9brB57.gif)
 
 ## Contributing
 To contribute please contact me thorugh email found on my GitHub
